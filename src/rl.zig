@@ -1,4 +1,16 @@
 pub const Color = extern struct {
+    pub const red = Color{ .r = 255, .a = 255 };
+    pub const blue = Color{ .b = 255, .a = 255 };
+
+    pub fn fromInt(int: u32) Color {
+        return Color{
+            .r = @truncate(int >> 24),
+            .g = @truncate(int >> 16),
+            .b = @truncate(int >> 8),
+            .a = @truncate(int),
+        };
+    }
+
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
@@ -33,7 +45,9 @@ extern "c" fn IsKeyPressed(key: Key) bool;
 extern "c" fn IsKeyDown(key: Key) bool;
 
 // Drawing Shapes
+extern "c" fn DrawCircle(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
 extern "c" fn DrawCircleV(center: Vector2, radius: f32, color: Color) void;
+extern "c" fn DrawCircleLines(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
 
 pub fn initWindow(width: u32, height: u32, title: [*:0]const u8) void {
     InitWindow(@intCast(width), @intCast(height), title);
@@ -70,7 +84,9 @@ pub const isKeyPressed = IsKeyPressed;
 pub const isKeyDown = IsKeyDown;
 
 // Shapes
+pub const drawCircle = DrawCircle;
 pub const drawCircleV = DrawCircleV;
+pub const drawCircleLines = DrawCircleLines;
 
 // Math
 pub const vector2Add = Vector2Add;

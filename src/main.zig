@@ -1,38 +1,33 @@
 const std = @import("std");
 const rl = @import("rl.zig");
+const math = std.math;
+
+const Ball = struct {
+    position: f32,
+    color: rl.Color,
+};
 
 const Vec = rl.Vector2;
 
-const Input = struct {
-    movement: Vec,
-};
+const BG_COLOR = rl.Color.fromInt(0x181818ff);
 
-const BG_COLOR = rl.Color{ .r = 255, .g = 200, .b = 200, .a = 255 };
+const BALL_SPEED: f32 = 270;
+const BALL_RADIUS: f32 = 30;
 
-const SPEED: f32 = 100;
-
-fn readInput() Input {
-    var movement_x: f32 = 0;
-    var movement_y: f32 = 0;
-    if (rl.isKeyDown(.d)) {
-        movement_x += 1;
-    }
-    if (rl.isKeyDown(.a)) {
-        movement_x -= 1;
-    }
-    if (rl.isKeyDown(.w)) {
-        movement_y -= 1;
-    }
-    if (rl.isKeyDown(.s)) {
-        movement_y += 1;
-    }
-
-    return Input{
-        .movement = Vec{ .x = movement_x, .y = movement_y },
-    };
+fn getCurvePosition(position: f32) Vec {
+    const turns: f32 = 10 - (position / 360);
+    const radians: f32 = turns * math.tau;
+    const x = math.cos(radians) * turns * 30 + 400;
+    const y = math.sin(radians) * turns * 30 + 300;
+    return Vec{ .x = x, .y = y };
 }
 
-pub fn main() !void {
+fn renderBall(ball: Ball) void {
+    const pos = getCurvePosition(ball.position);
+    rl.drawCircleV(pos, BALL_RADIUS, ball.color);
+}
+
+pub fn main() void {
     std.debug.print("Hello, world!\n", .{});
 
     rl.initWindow(800, 600, "Raylib window");
@@ -40,15 +35,23 @@ pub fn main() !void {
 
     rl.setTargetFPS(60);
 
-    var circle_pos = Vec{ .x = 100, .y = 200 };
+    var balls = [_]Ball{
+        Ball{ .position = 90, .color = rl.Color.fromInt(0x32a852ff) },
+        Ball{ .position = 130, .color = rl.Color.fromInt(0xb8ac32ff) },
+        Ball{ .position = 170, .color = rl.Color.fromInt(0xa83832ff) },
+        Ball{ .position = 210, .color = rl.Color.fromInt(0x3242a8ff) },
+        Ball{ .position = 250, .color = rl.Color.fromInt(0x32a852ff) },
+        Ball{ .position = 290, .color = rl.Color.fromInt(0xb8ac32ff) },
+        Ball{ .position = 330, .color = rl.Color.fromInt(0xa83832ff) },
+    };
 
     while (!rl.windowShouldClose()) {
         // Frame update
         const delta = rl.getFrameTime();
-        const input = readInput();
 
-        const move = rl.vector2Scale(input.movement, SPEED * delta);
-        circle_pos = rl.vector2Add(circle_pos, move);
+        for (balls, 0..) |ball, i| {
+            balls[i].position = ball.position + BALL_SPEED * delta;
+        }
 
         // Rendering
         rl.beginDrawing();
@@ -56,8 +59,8 @@ pub fn main() !void {
 
         rl.clearBackground(BG_COLOR);
 
-        const circle_radius: f32 = 40.0;
-        const circle_color = rl.Color{ .b = 255, .a = 255 };
-        rl.drawCircleV(circle_pos, circle_radius, circle_color);
+        for (balls) |ball| {
+            renderBall(ball);
+        }
     }
 }
