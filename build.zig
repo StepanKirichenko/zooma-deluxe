@@ -1,6 +1,10 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+const BuildError = error{
+    RaypathNotSpecified,
+};
+
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
 
     const optimize = b.standardOptimizeOption(.{});
@@ -12,7 +16,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe.addObjectFile(std.Build.LazyPath{ .path = "/users/asv-dgr-2/personal/code/libs/raylib/lib/libraylib.a" });
+    const raypath = std.os.getenv("RAYPATH") orelse {
+        std.debug.print("{s}", .{"Error: environment variable RAYPATH should contain the path to libraylib.a\n"});
+        return BuildError.RaypathNotSpecified;
+    };
+
+    exe.addObjectFile(std.Build.LazyPath{ .path = raypath });
     exe.linkLibC();
     exe.linkFramework("OpenGL");
     exe.linkFramework("Cocoa");
