@@ -1,6 +1,8 @@
 pub const Color = extern struct {
     pub const red = Color{ .r = 255, .a = 255 };
     pub const blue = Color{ .b = 255, .a = 255 };
+    pub const green = Color{ .g = 255, .a = 255 };
+    pub const purple = Color{ .r = 255, .b = 255, .a = 255 };
 
     pub fn fromInt(int: u32) Color {
         return Color{
@@ -28,7 +30,11 @@ pub const Vector2 = extern struct {
     pub const add = vector2Add;
     pub const subtract = vector2Subtract;
     pub const scale = vector2Scale;
-    pub const distanceTo = vector2Distance;
+    pub const distance = vector2Distance;
+    pub const normalize = vector2Normalize;
+    pub const length = vector2Length;
+    pub const rotate = vector2Rotate;
+    pub const angle = vector2Angle;
 };
 
 pub const Key = enum(c_int) {
@@ -50,6 +56,10 @@ extern "c" fn Vector2Scale(vector: Vector2, scale: f32) Vector2;
 extern "c" fn Vector2Add(vector1: Vector2, vector2: Vector2) Vector2;
 extern "c" fn Vector2Subtract(vector1: Vector2, vector2: Vector2) Vector2;
 extern "c" fn Vector2Distance(vector1: Vector2, vector2: Vector2) f32;
+extern "c" fn Vector2Normalize(vector: Vector2) Vector2;
+extern "c" fn Vector2Length(vector: Vector2) f32;
+extern "c" fn Vector2Rotate(vector: Vector2, angle: f32) Vector2;
+extern "c" fn Vector2Angle(vector1: Vector2, vector2: Vector2) f32;
 
 // Input
 extern "c" fn IsKeyPressed(key: Key) bool;
@@ -104,3 +114,7 @@ pub const vector2Add = Vector2Add;
 pub const vector2Subtract = Vector2Subtract;
 pub const vector2Distance = Vector2Distance;
 pub const vector2Scale = Vector2Scale;
+pub const vector2Normalize = Vector2Normalize;
+pub const vector2Length = Vector2Length;
+pub const vector2Rotate = Vector2Rotate;
+pub const vector2Angle = Vector2Angle;
