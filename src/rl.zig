@@ -35,6 +35,8 @@ pub const Vector2 = extern struct {
     pub const length = vector2Length;
     pub const rotate = vector2Rotate;
     pub const angle = vector2Angle;
+
+    pub const zero = Vector2{ .x = 0, .y = 0 };
 };
 
 pub const Key = enum(c_int) {
@@ -69,6 +71,7 @@ extern "c" fn IsKeyDown(key: Key) bool;
 extern "c" fn DrawCircle(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
 extern "c" fn DrawCircleV(center: Vector2, radius: f32, color: Color) void;
 extern "c" fn DrawCircleLines(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
+extern "c" fn DrawLineV(start: Vector2, end: Vector2, color: Color) void;
 
 pub fn initWindow(width: u32, height: u32, title: [*:0]const u8) void {
     InitWindow(@intCast(width), @intCast(height), title);
@@ -108,6 +111,7 @@ pub const isKeyDown = IsKeyDown;
 pub const drawCircle = DrawCircle;
 pub const drawCircleV = DrawCircleV;
 pub const drawCircleLines = DrawCircleLines;
+pub const drawLineV = DrawLineV;
 
 // Math
 pub const vector2Add = Vector2Add;
