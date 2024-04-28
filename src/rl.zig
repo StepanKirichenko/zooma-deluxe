@@ -20,6 +20,15 @@ pub const Color = extern struct {
 pub const Vector2 = extern struct {
     x: f32 = 0,
     y: f32 = 0,
+
+    pub fn new(x: f32, y: f32) Vector2 {
+        return Vector2{ .x = x, .y = y };
+    }
+
+    pub const add = vector2Add;
+    pub const subtract = vector2Subtract;
+    pub const scale = vector2Scale;
+    pub const distanceTo = vector2Distance;
 };
 
 pub const Key = enum(c_int) {
@@ -39,6 +48,8 @@ extern "c" fn ClearBackground(color: Color) void;
 extern "c" fn GetFrameTime() f32;
 extern "c" fn Vector2Scale(vector: Vector2, scale: f32) Vector2;
 extern "c" fn Vector2Add(vector1: Vector2, vector2: Vector2) Vector2;
+extern "c" fn Vector2Subtract(vector1: Vector2, vector2: Vector2) Vector2;
+extern "c" fn Vector2Distance(vector1: Vector2, vector2: Vector2) f32;
 
 // Input
 extern "c" fn IsKeyPressed(key: Key) bool;
@@ -90,4 +101,6 @@ pub const drawCircleLines = DrawCircleLines;
 
 // Math
 pub const vector2Add = Vector2Add;
+pub const vector2Subtract = Vector2Subtract;
+pub const vector2Distance = Vector2Distance;
 pub const vector2Scale = Vector2Scale;
