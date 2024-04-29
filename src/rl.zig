@@ -46,6 +46,12 @@ pub const Key = enum(c_int) {
     w = 87,
 };
 
+pub const MouseButton = enum(c_int) {
+    left = 0,
+    right = 1,
+    middle = 2,
+};
+
 extern "c" fn InitWindow(width: c_int, height: c_int, title: [*:0]const u8) void;
 extern "c" fn SetTargetFPS(fps: c_int) void;
 extern "c" fn CloseWindow() void;
@@ -54,6 +60,7 @@ extern "c" fn BeginDrawing() void;
 extern "c" fn EndDrawing() void;
 extern "c" fn ClearBackground(color: Color) void;
 extern "c" fn GetFrameTime() f32;
+extern "c" fn GetTime() f64;
 extern "c" fn Vector2Scale(vector: Vector2, scale: f32) Vector2;
 extern "c" fn Vector2Add(vector1: Vector2, vector2: Vector2) Vector2;
 extern "c" fn Vector2Subtract(vector1: Vector2, vector2: Vector2) Vector2;
@@ -66,6 +73,11 @@ extern "c" fn Vector2Angle(vector1: Vector2, vector2: Vector2) f32;
 // Input
 extern "c" fn IsKeyPressed(key: Key) bool;
 extern "c" fn IsKeyDown(key: Key) bool;
+extern "c" fn IsMouseButtonPressed(button: MouseButton) bool;
+extern "c" fn IsMouseButtonDown(button: MouseButton) bool;
+extern "c" fn IsMouseButtonReleased(button: MouseButton) bool;
+extern "c" fn IsMouseButtonUp(button: MouseButton) bool;
+extern "c" fn GetMousePosition() Vector2;
 
 // Drawing Shapes
 extern "c" fn DrawCircle(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
@@ -102,10 +114,16 @@ pub fn clearBackground(color: Color) void {
 }
 
 pub const getFrameTime = GetFrameTime;
+pub const getTime = GetTime;
 
 // Input
 pub const isKeyPressed = IsKeyPressed;
 pub const isKeyDown = IsKeyDown;
+pub const isMouseButtonUp = IsMouseButtonUp;
+pub const isMouseButtonDown = IsMouseButtonDown;
+pub const isMouseButtonPressed = IsMouseButtonPressed;
+pub const isMouseButtonReleased = IsMouseButtonReleased;
+pub const getMousePosition = GetMousePosition;
 
 // Shapes
 pub const drawCircle = DrawCircle;
