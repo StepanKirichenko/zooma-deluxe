@@ -90,6 +90,27 @@ extern "c" fn DrawCircle(center_x: c_int, center_x: c_int, radius: f32, color: C
 extern "c" fn DrawCircleV(center: Vector2, radius: f32, color: Color) void;
 extern "c" fn DrawCircleLines(center_x: c_int, center_x: c_int, radius: f32, color: Color) void;
 extern "c" fn DrawLineV(start: Vector2, end: Vector2, color: Color) void;
+extern "c" fn DrawRing(
+    center: Vector2,
+    innerRadius: f32,
+    outerRadius: f32,
+    startAngle: f32,
+    endAngle: f32,
+    segments: c_int,
+    color: Color,
+) void; // Draw ring
+extern "c" fn DrawRingLines(
+    center: Vector2,
+    innerRadius: f32,
+    outerRadius: f32,
+    startAngle: f32,
+    endAngle: f32,
+    segments: c_int,
+    color: Color,
+) void;
+
+// Colors
+extern "c" fn ColorAlpha(color: Color, alpha: f32) Color;
 
 pub fn initWindow(width: u32, height: u32, title: [*:0]const u8) void {
     InitWindow(@intCast(width), @intCast(height), title);
@@ -136,6 +157,11 @@ pub const drawCircle = DrawCircle;
 pub const drawCircleV = DrawCircleV;
 pub const drawCircleLines = DrawCircleLines;
 pub const drawLineV = DrawLineV;
+pub const drawRing = DrawRing;
+pub const drawRingLines = DrawRingLines;
+
+// Colors
+pub const colorAlpha = ColorAlpha;
 
 // Math
 pub const vector2Add = Vector2Add;

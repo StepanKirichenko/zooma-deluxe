@@ -44,6 +44,13 @@ const Ball = struct {
     state: BallState = .moving,
 };
 
+const BallExplosionEffect = struct {
+    lifetime: f32 = 0,
+    is_active: bool = false,
+    position: Vec = Vec.zero,
+    color: BallColor = BallColor.red,
+};
+
 const Projectile = struct {
     position: Vec = Vec.zero,
     direction: Vec = Vec.zero,
@@ -82,6 +89,7 @@ const GameState = struct {
     path: paths.Path,
     balls: std.ArrayList(Ball),
     projectiles: std.ArrayList(Projectile),
+    explosion_effects: std.ArrayList(BallExplosionEffect),
 };
 
 fn initGameState(state: *GameState) !void {
@@ -95,13 +103,13 @@ fn initGameState(state: *GameState) !void {
 
     const init_balls = [_]Ball{
         Ball{ .offset = 0, .color = .red },
-        // Ball{ .offset = 400, .color = .yellow },
-        // Ball{ .offset = 460, .color = .green },
-        // Ball{ .offset = 700, .color = .blue },
-        // Ball{ .offset = 800, .color = .red },
+        Ball{ .offset = 400, .color = .yellow },
+        Ball{ .offset = 460, .color = .green },
+        Ball{ .offset = 700, .color = .blue },
+        Ball{ .offset = 800, .color = .red },
         Ball{ .offset = 860, .color = .yellow },
-        // Ball{ .offset = 1200, .color = .green },
-        // Ball{ .offset = 1380, .color = .blue },
+        Ball{ .offset = 1200, .color = .green },
+        Ball{ .offset = 1380, .color = .blue },
     };
 
     state.balls = std.ArrayList(Ball).init(allocator);
@@ -125,21 +133,26 @@ fn initGameState(state: *GameState) !void {
 
     state.projectiles = std.ArrayList(Projectile).init(allocator);
     try state.projectiles.appendNTimes(Projectile{}, 10);
+
+    state.explosion_effects = std.ArrayList(BallExplosionEffect).init(allocator);
+    try state.explosion_effects.appendNTimes(.{}, 10);
 }
 
 fn deinitGameState(state: *GameState) void {
     state.balls.deinit();
     state.path.deinit();
     state.projectiles.deinit();
+    state.explosion_effects.deinit();
 }
 
 const Vec = rl.Vector2;
 
 const BG_COLOR = rl.Color.fromInt(0x181818ff);
 
-const BALL_SPEED: f32 = 200;
-// const BALL_SPEED: f32 = 0;
+const BALL_SPEED: f32 = 150;
 const BALL_RADIUS: f32 = 20;
+
+const EXPLOSION_EFFECT_LIFETIME: f32 = 0.2;
 
 const PROJECTILE_SPEED: f32 = 1000;
 
@@ -197,18 +210,48 @@ const Range = struct {
     end: usize,
 };
 
+fn areBallsTouching(ball1: Ball, ball2: Ball) bool {
+    return @abs(ball2.offset - ball1.offset) - BALL_RADIUS * 2 <= 1;
+}
+
 fn getSameColorRange(state: *GameState, ball_index: usize) Range {
-    const current_ball_color = state.balls.items[ball_index].color;
+    const current_ball = state.balls.items[ball_index];
     var start: usize = ball_index;
-    while (start > 0 and state.balls.items[start - 1].color == current_ball_color) {
+    while (start > 0) {
+        const ball = state.balls.items[start - 1];
+        const prev_ball = state.balls.items[start];
+        if (!areBallsTouching(prev_ball, ball)) break;
+        if (current_ball.color != ball.color) break;
         start -= 1;
     }
     var end = ball_index + 1;
-    while (end < state.balls.items.len and state.balls.items[end].color == current_ball_color) {
+    while (end < state.balls.items.len) {
+        const ball = state.balls.items[end];
+        const prev_ball = state.balls.items[end - 1];
+        if (!areBallsTouching(prev_ball, ball)) break;
+        if (current_ball.color != ball.color) break;
         end += 1;
     }
 
     return .{ .start = start, .end = end };
+}
+
+fn createExplosionEffect(state: *GameState, position: Vec, color: BallColor) void {
+    var inactive_effect: ?*BallExplosionEffect = null;
+    for (state.explosion_effects.items) |*effect| {
+        if (!effect.is_active) {
+            inactive_effect = effect;
+            break;
+        }
+    }
+
+    const effect = inactive_effect orelse return;
+    effect.* = .{
+        .is_active = true,
+        .lifetime = 0,
+        .position = position,
+        .color = color,
+    };
 }
 
 fn updateBalls(state: *GameState) !void {
@@ -238,15 +281,20 @@ fn updateBalls(state: *GameState) !void {
             var should_increment = true;
             switch (balls[i].state) {
                 .inserting => |s| {
-                    std.debug.print("Inserting: {}\n", .{s.progress});
                     if (s.progress >= 1) {
                         balls[i].state = .moving;
-                        std.debug.print("Inserted\n", .{});
                         const same_color_range = getSameColorRange(state, i);
                         const range_lenght = same_color_range.end - same_color_range.start;
-                        std.debug.print("Range length: {}\n", .{range_lenght});
+                        std.debug.print("Range len: {}\n", .{range_lenght});
                         if (range_lenght >= 3) {
                             should_increment = false;
+                            for (state.balls.items[same_color_range.start..same_color_range.end]) |ball| {
+                                createExplosionEffect(
+                                    state,
+                                    state.path.getPosition(ball.offset),
+                                    ball.color,
+                                );
+                            }
                             try state.balls.replaceRange(same_color_range.start, range_lenght, &.{});
                             i = same_color_range.start;
                         }
@@ -277,6 +325,15 @@ fn update(state: *GameState) !void {
     const aim_direction = mouse_position.subtract(state.player.position).normalize();
 
     try updateBalls(state);
+
+    // Explosion effects
+    for (state.explosion_effects.items) |*effect| {
+        if (!effect.is_active) continue;
+        effect.lifetime += delta;
+        if (effect.lifetime > EXPLOSION_EFFECT_LIFETIME) {
+            effect.is_active = false;
+        }
+    }
 
     if (left_mb_pressed and state.player.state != .shooting) {
         for (state.projectiles.items) |*projectile| {
@@ -350,6 +407,14 @@ fn render(state: *GameState) void {
             },
         };
         renderBall(ball, position);
+    }
+
+    for (state.explosion_effects.items) |explosion| {
+        if (!explosion.is_active) continue;
+        const t = explosion.lifetime / EXPLOSION_EFFECT_LIFETIME;
+        const radius = BALL_RADIUS * 2 * (0.5 + t * 0.7);
+        const color = rl.colorAlpha(explosion.color.getColor(), 1 - t);
+        rl.drawRing(explosion.position, radius, radius + 5, 0, 360, 90, color);
     }
 
     renderPlayer(state.player);
