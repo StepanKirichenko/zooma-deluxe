@@ -7,6 +7,9 @@ const math = std.math;
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
+var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+const temp_allocator = arena.allocator();
+
 var prng = std.rand.DefaultPrng.init(10);
 const rand = prng.random();
 
@@ -74,6 +77,7 @@ const Player = struct {
 };
 
 const GameState = struct {
+    delta: f32 = 0,
     player: Player,
     path: paths.Path,
     balls: std.ArrayList(Ball),
@@ -188,18 +192,33 @@ fn getProjectileBallCollision(state: *GameState, projectile: Projectile) Project
     return .{ .insertion_index = null };
 }
 
-fn update(state: *GameState) !void {
-    const delta = rl.getFrameTime();
-    const time = rl.getTime();
+const Range = struct {
+    start: usize,
+    end: usize,
+};
 
-    const mouse_position = rl.getMousePosition();
-    // const left_mb_down = rl.isMouseButtonDown(.left);
-    const left_mb_pressed = rl.isMouseButtonPressed(.left);
+fn getSameColorRange(state: *GameState, ball_index: usize) Range {
+    const current_ball_color = state.balls.items[ball_index].color;
+    var start: usize = ball_index;
+    while (start > 0 and state.balls.items[start - 1].color == current_ball_color) {
+        start -= 1;
+    }
+    var end = ball_index + 1;
+    while (end < state.balls.items.len and state.balls.items[end].color == current_ball_color) {
+        end += 1;
+    }
 
-    const aim_direction = mouse_position.subtract(state.player.position).normalize();
+    return .{ .start = start, .end = end };
+}
 
+fn updateBalls(state: *GameState) !void {
+    const delta = state.delta;
     // Ball movement
     const balls = state.balls.items;
+    if (balls.len == 0) {
+        return;
+    }
+
     balls[0].offset += BALL_SPEED * delta;
     for (1..balls.len) |i| {
         var new_offset = balls[i].offset;
@@ -210,31 +229,54 @@ fn update(state: *GameState) !void {
         };
         if (offset_forced > new_offset) new_offset = offset_forced;
         balls[i].offset = new_offset;
-        switch (balls[i].state) {
-            .inserting => |s| {
-                if (s.progress >= 1) {
-                    balls[i].state = .moving;
-                } else {
-                    balls[i].state.inserting.progress += delta * 10;
-                }
-            },
-            else => {},
-        }
     }
 
     // Ball state change
-    for (0..balls.len) |i| {
-        switch (balls[i].state) {
-            .inserting => |s| {
-                if (s.progress >= 1) {
-                    balls[i].state = .moving;
-                } else {
-                    balls[i].state.inserting.progress += delta * 10;
-                }
-            },
-            else => {},
+    {
+        var i: usize = 0;
+        while (i < state.balls.items.len) {
+            var should_increment = true;
+            switch (balls[i].state) {
+                .inserting => |s| {
+                    std.debug.print("Inserting: {}\n", .{s.progress});
+                    if (s.progress >= 1) {
+                        balls[i].state = .moving;
+                        std.debug.print("Inserted\n", .{});
+                        const same_color_range = getSameColorRange(state, i);
+                        const range_lenght = same_color_range.end - same_color_range.start;
+                        std.debug.print("Range length: {}\n", .{range_lenght});
+                        if (range_lenght >= 3) {
+                            should_increment = false;
+                            try state.balls.replaceRange(same_color_range.start, range_lenght, &.{});
+                            i = same_color_range.start;
+                        }
+                    } else {
+                        balls[i].state.inserting.progress += delta * 10;
+                    }
+                },
+                else => {},
+            }
+            if (should_increment) {
+                i += 1;
+            }
         }
     }
+}
+
+fn update(state: *GameState) !void {
+    const delta = rl.getFrameTime();
+    const time = rl.getTime();
+
+    state.delta = delta;
+
+    // Input
+    const mouse_position = rl.getMousePosition();
+    // const left_mb_down = rl.isMouseButtonDown(.left);
+    const left_mb_pressed = rl.isMouseButtonPressed(.left);
+
+    const aim_direction = mouse_position.subtract(state.player.position).normalize();
+
+    try updateBalls(state);
 
     if (left_mb_pressed and state.player.state != .shooting) {
         for (state.projectiles.items) |*projectile| {
@@ -338,5 +380,6 @@ pub fn main() !void {
     while (!rl.windowShouldClose()) {
         try update(&state);
         render(&state);
+        _ = arena.reset(.retain_capacity);
     }
 }
