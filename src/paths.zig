@@ -15,6 +15,13 @@ pub const Segment = union(enum) {
         };
     }
 
+    pub fn getDirection(self: Segment, offset: f32) Vec {
+        return switch (self) {
+            Segment.line => |line| line.getDirection(),
+            Segment.arc => |arc| arc.getDirection(offset),
+        };
+    }
+
     pub fn getLength(self: Segment) f32 {
         return switch (self) {
             Segment.line => |line| line.length,
@@ -28,6 +35,24 @@ pub const Path = struct {
     length: f32,
 
     pub fn getPosition(self: Path, offset: f32) Vec {
+        const segment_and_offset = self.getSegment(offset);
+        return segment_and_offset.segment.getPosition(segment_and_offset.offset_left);
+    }
+
+    pub fn getDirection(self: Path, offset: f32) Vec {
+        const segment_and_offset = self.getSegment(offset);
+        return segment_and_offset.segment.getDirection(segment_and_offset.offset_left);
+    }
+
+    pub fn getLength(self: Path) f32 {
+        return self.length;
+    }
+
+    pub fn deinit(self: Path) void {
+        self.segments.deinit();
+    }
+
+    fn getSegment(self: Path, offset: f32) struct { segment: Segment, offset_left: f32 } {
         var i: usize = 0;
         var offset_left = offset;
         while (i < self.segments.items.len - 1 and offset_left > self.segments.items[i].getLength()) {
@@ -39,15 +64,7 @@ pub const Path = struct {
             i = self.segments.items.len - 1;
         }
 
-        return self.segments.items[i].getPosition(offset_left);
-    }
-
-    pub fn getLength(self: Path) f32 {
-        return self.length;
-    }
-
-    pub fn deinit(self: Path) void {
-        self.segments.deinit();
+        return .{ .segment = self.segments.items[i], .offset_left = offset_left };
     }
 
     pub fn new(segments: SegmentList) Path {
@@ -73,15 +90,18 @@ pub const LineSegment = struct {
     direction: Vec,
 
     pub fn getPosition(self: LineSegment, offset: f32) Vec {
-        const t = offset / self.length;
-        const movement = self.direction.scale(t);
+        const movement = self.direction.scale(offset);
         const position = self.start.add(movement);
         return position;
     }
 
+    pub fn getDirection(self: LineSegment) Vec {
+        return self.direction;
+    }
+
     pub fn new(start: Vec, end: Vec) Segment {
         const length = start.distance(end);
-        const direction = end.subtract(start);
+        const direction = end.subtract(start).normalize();
         return Segment{ .line = LineSegment{
             .start = start,
             .end = end,
@@ -126,11 +146,23 @@ pub const ArcSegment = struct {
     }
 
     pub fn getPosition(self: ArcSegment, offset: f32) Vec {
+        const displacement = self.getDisplacement(offset);
+        const position = self.center.add(displacement);
+        return position;
+    }
+
+    pub fn getDirection(self: ArcSegment, offset: f32) Vec {
+        const displacement = self.getDisplacement(offset).normalize();
+        const rotation: f32 = if (self.direction == .Clockwise) math.pi * 0.5 else -math.pi * 0.5;
+        const direction = displacement.rotate(rotation);
+        return direction;
+    }
+
+    fn getDisplacement(self: ArcSegment, offset: f32) Vec {
         const t = offset / self.length;
         const direction_coeff: f32 = if (self.direction == .Clockwise) 1 else -1;
         const rotation = self.angle * t * direction_coeff;
         const displacement = self.start_displacement.rotate(rotation);
-        const position = self.center.add(displacement);
-        return position;
+        return displacement;
     }
 };

@@ -27,9 +27,18 @@ const BallColor = enum(u32) {
     }
 };
 
+const BallState = union(enum) {
+    moving: void,
+    inserting: struct {
+        start_position: Vec,
+        progress: f32,
+    },
+};
+
 const Ball = struct {
     offset: f32,
     color: BallColor,
+    state: BallState = .moving,
 };
 
 const Projectile = struct {
@@ -82,13 +91,13 @@ fn initGameState(state: *GameState) !void {
 
     const init_balls = [_]Ball{
         Ball{ .offset = 0, .color = .red },
-        Ball{ .offset = 400, .color = .yellow },
-        Ball{ .offset = 460, .color = .green },
-        Ball{ .offset = 700, .color = .blue },
-        Ball{ .offset = 800, .color = .red },
+        // Ball{ .offset = 400, .color = .yellow },
+        // Ball{ .offset = 460, .color = .green },
+        // Ball{ .offset = 700, .color = .blue },
+        // Ball{ .offset = 800, .color = .red },
         Ball{ .offset = 860, .color = .yellow },
-        Ball{ .offset = 1200, .color = .green },
-        Ball{ .offset = 1380, .color = .blue },
+        // Ball{ .offset = 1200, .color = .green },
+        // Ball{ .offset = 1380, .color = .blue },
     };
 
     state.balls = std.ArrayList(Ball).init(allocator);
@@ -125,6 +134,7 @@ const Vec = rl.Vector2;
 const BG_COLOR = rl.Color.fromInt(0x181818ff);
 
 const BALL_SPEED: f32 = 200;
+// const BALL_SPEED: f32 = 0;
 const BALL_RADIUS: f32 = 20;
 
 const PROJECTILE_SPEED: f32 = 1000;
@@ -155,7 +165,30 @@ fn renderPlayer(player: Player) void {
     }
 }
 
-fn update(state: *GameState) void {
+const ProjectileBallCollision = struct {
+    insertion_index: ?usize,
+    insertion_offset: f32 = 0,
+};
+
+fn getProjectileBallCollision(state: *GameState, projectile: Projectile) ProjectileBallCollision {
+    const balls = state.balls.items;
+    for (balls, 0..) |ball, i| {
+        const ball_position = state.path.getPosition(ball.offset);
+        const distance = rl.vector2Distance(ball_position, projectile.position);
+        if (distance > 2 * BALL_RADIUS) continue;
+        const ball_direction = state.path.getDirection(ball.offset).scale(BALL_RADIUS);
+        const front = ball_position.add(ball_direction);
+        const back = ball_position.subtract(ball_direction);
+        const front_distance = projectile.position.distance(front);
+        const back_distance = projectile.position.distance(back);
+        const insertion_index = if (front_distance < back_distance) i + 1 else i;
+        const insertion_offset = if (front_distance < back_distance) ball.offset + BALL_RADIUS * 2 else ball.offset;
+        return .{ .insertion_index = insertion_index, .insertion_offset = insertion_offset };
+    }
+    return .{ .insertion_index = null };
+}
+
+fn update(state: *GameState) !void {
     const delta = rl.getFrameTime();
     const time = rl.getTime();
 
@@ -165,11 +198,42 @@ fn update(state: *GameState) void {
 
     const aim_direction = mouse_position.subtract(state.player.position).normalize();
 
+    // Ball movement
     const balls = state.balls.items;
     balls[0].offset += BALL_SPEED * delta;
     for (1..balls.len) |i| {
-        if (balls[i].offset - balls[i - 1].offset > BALL_RADIUS * 2) break;
-        balls[i].offset = balls[i - 1].offset + BALL_RADIUS * 2;
+        var new_offset = balls[i].offset;
+        const prev_ball = balls[i - 1];
+        const offset_forced = switch (prev_ball.state) {
+            .moving => prev_ball.offset + BALL_RADIUS * 2,
+            .inserting => |s| prev_ball.offset + BALL_RADIUS * 2 * s.progress,
+        };
+        if (offset_forced > new_offset) new_offset = offset_forced;
+        balls[i].offset = new_offset;
+        switch (balls[i].state) {
+            .inserting => |s| {
+                if (s.progress >= 1) {
+                    balls[i].state = .moving;
+                } else {
+                    balls[i].state.inserting.progress += delta * 10;
+                }
+            },
+            else => {},
+        }
+    }
+
+    // Ball state change
+    for (0..balls.len) |i| {
+        switch (balls[i].state) {
+            .inserting => |s| {
+                if (s.progress >= 1) {
+                    balls[i].state = .moving;
+                } else {
+                    balls[i].state.inserting.progress += delta * 10;
+                }
+            },
+            else => {},
+        }
     }
 
     if (left_mb_pressed and state.player.state != .shooting) {
@@ -195,6 +259,16 @@ fn update(state: *GameState) void {
         projectile.position = projectile.position.add(movement);
         projectile.lifetime += delta;
         if (projectile.lifetime > 1) {
+            projectile.is_active = false;
+        }
+        const collision = getProjectileBallCollision(state, projectile.*);
+        if (collision.insertion_index) |i| {
+            const new_ball = Ball{
+                .offset = collision.insertion_offset,
+                .color = projectile.color,
+                .state = .{ .inserting = .{ .progress = 0, .start_position = projectile.position } },
+            };
+            try state.balls.insert(i, new_ball);
             projectile.is_active = false;
         }
     }
@@ -226,7 +300,13 @@ fn render(state: *GameState) void {
     visualizePath(state.path, 20, rl.Color.red);
 
     for (state.balls.items) |ball| {
-        const position = state.path.getPosition(ball.offset);
+        const position = switch (ball.state) {
+            .moving => state.path.getPosition(ball.offset),
+            .inserting => |s| blk: {
+                const final_pos = state.path.getPosition(ball.offset);
+                break :blk rl.vector2Lerp(s.start_position, final_pos, s.progress);
+            },
+        };
         renderBall(ball, position);
     }
 
@@ -256,7 +336,7 @@ pub fn main() !void {
     defer deinitGameState(&state);
 
     while (!rl.windowShouldClose()) {
-        update(&state);
+        try update(&state);
         render(&state);
     }
 }

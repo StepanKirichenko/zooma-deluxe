@@ -74,6 +74,7 @@ extern "c" fn Vector2Normalize(vector: Vector2) Vector2;
 extern "c" fn Vector2Length(vector: Vector2) f32;
 extern "c" fn Vector2Rotate(vector: Vector2, angle: f32) Vector2;
 extern "c" fn Vector2Angle(vector1: Vector2, vector2: Vector2) f32;
+extern "c" fn Vector2Lerp(vector1: Vector2, vector2: Vector2, amount: f32) Vector2;
 
 // Input
 extern "c" fn IsKeyPressed(key: Key) bool;
@@ -145,3 +146,4 @@ pub const vector2Normalize = Vector2Normalize;
 pub const vector2Length = Vector2Length;
 pub const vector2Rotate = Vector2Rotate;
 pub const vector2Angle = Vector2Angle;
+pub const vector2Lerp = Vector2Lerp;
