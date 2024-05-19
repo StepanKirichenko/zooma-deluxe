@@ -1,8 +1,9 @@
 pub const Color = extern struct {
-    pub const red = Color{ .r = 255, .a = 255 };
-    pub const blue = Color{ .b = 255, .a = 255 };
-    pub const green = Color{ .g = 255, .a = 255 };
-    pub const purple = Color{ .r = 255, .b = 255, .a = 255 };
+    pub const red = Color{ .r = 230, .g = 41, .b = 55, .a = 255 };
+    pub const blue = Color{ .r = 0, .g = 121, .b = 241, .a = 255 };
+    pub const green = Color{ .r = 0, .g = 228, .b = 48, .a = 255 };
+    pub const yellow = Color{ .r = 253, .g = 249, .b = 0, .a = 255 };
+    pub const purple = Color{ .r = 200, .g = 122, .b = 255, .a = 255 };
 
     pub fn fromInt(int: u32) Color {
         return Color{
@@ -11,6 +12,10 @@ pub const Color = extern struct {
             .b = @truncate(int >> 8),
             .a = @truncate(int),
         };
+    }
+
+    pub fn toInt(self: @This()) u32 {
+        return (@as(u32, self.r) << 24) | (@as(u32, self.g) << 16) | (@as(u32, self.b) << 8) | @as(u32, self.a);
     }
 
     r: u8 = 0,

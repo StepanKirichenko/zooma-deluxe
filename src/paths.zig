@@ -4,45 +4,85 @@ const math = std.math;
 
 const Vec = rl.Vector2;
 
-pub const Path = union(enum) {
-    line: LinePath,
-    arc: ArcPath,
-    multiSegment: MultiSegmentPath,
+pub const Segment = union(enum) {
+    line: LineSegment,
+    arc: ArcSegment,
 
-    pub fn getPosition(self: Path, offset: f32) Vec {
+    pub fn getPosition(self: Segment, offset: f32) Vec {
         return switch (self) {
-            Path.line => |line| line.getPosition(offset),
-            Path.arc => |arc| arc.getPosition(offset),
-            Path.multiSegment => |ms| ms.getPosition(offset),
+            Segment.line => |line| line.getPosition(offset),
+            Segment.arc => |arc| arc.getPosition(offset),
         };
     }
 
-    pub fn getLength(self: Path) f32 {
+    pub fn getLength(self: Segment) f32 {
         return switch (self) {
-            Path.line => |line| line.length,
-            Path.arc => |arc| arc.length,
-            Path.multiSegment => |ms| ms.length,
+            Segment.line => |line| line.length,
+            Segment.arc => |arc| arc.length,
         };
     }
 };
 
-pub const LinePath = struct {
+pub const Path = struct {
+    segments: SegmentList,
+    length: f32,
+
+    pub fn getPosition(self: Path, offset: f32) Vec {
+        var i: usize = 0;
+        var offset_left = offset;
+        while (i < self.segments.items.len - 1 and offset_left > self.segments.items[i].getLength()) {
+            offset_left -= self.segments.items[i].getLength();
+            i += 1;
+        }
+
+        if (i >= self.segments.items.len) {
+            i = self.segments.items.len - 1;
+        }
+
+        return self.segments.items[i].getPosition(offset_left);
+    }
+
+    pub fn getLength(self: Path) f32 {
+        return self.length;
+    }
+
+    pub fn deinit(self: Path) void {
+        self.segments.deinit();
+    }
+
+    pub fn new(segments: SegmentList) Path {
+        if (segments.items.len == 0) {
+            @panic("MultiSegmentPath should have at least one segment");
+        }
+
+        var length: f32 = 0;
+        for (segments.items) |segment| {
+            length += segment.getLength();
+        }
+
+        return Path{ .segments = segments, .length = length };
+    }
+
+    pub const SegmentList = std.ArrayList(Segment);
+};
+
+pub const LineSegment = struct {
     start: Vec,
     end: Vec,
     length: f32,
     direction: Vec,
 
-    pub fn getPosition(self: LinePath, offset: f32) Vec {
+    pub fn getPosition(self: LineSegment, offset: f32) Vec {
         const t = offset / self.length;
         const movement = self.direction.scale(t);
         const position = self.start.add(movement);
         return position;
     }
 
-    pub fn new(start: Vec, end: Vec) Path {
+    pub fn new(start: Vec, end: Vec) Segment {
         const length = start.distance(end);
         const direction = end.subtract(start);
-        return Path{ .line = LinePath{
+        return Segment{ .line = LineSegment{
             .start = start,
             .end = end,
             .length = length,
@@ -51,7 +91,7 @@ pub const LinePath = struct {
     }
 };
 
-pub const ArcPath = struct {
+pub const ArcSegment = struct {
     pub const Direction = enum { Clockwise, Counterclockwise };
 
     direction: Direction,
@@ -61,7 +101,7 @@ pub const ArcPath = struct {
     angle: f32,
     length: f32,
 
-    pub fn new(start: Vec, end: Vec, center_offset: f32, direction: Direction) Path {
+    pub fn new(start: Vec, end: Vec, center_offset: f32, direction: Direction) Segment {
         const half_diff = end.subtract(start).scale(0.5);
         const chord_center = start.add(half_diff);
         const normal = half_diff.rotate(@as(f32, math.pi) / 2).normalize();
@@ -75,7 +115,7 @@ pub const ArcPath = struct {
         const arc_angle = if (direction == .Clockwise) vec_angle else math.tau - vec_angle;
         const radius = start_displacement.length();
         const length = arc_angle * radius;
-        return Path{ .arc = ArcPath{
+        return Segment{ .arc = ArcSegment{
             .direction = direction,
             .center = center,
             .start_displacement = start_displacement,
@@ -85,52 +125,12 @@ pub const ArcPath = struct {
         } };
     }
 
-    pub fn getPosition(self: ArcPath, offset: f32) Vec {
+    pub fn getPosition(self: ArcSegment, offset: f32) Vec {
         const t = offset / self.length;
         const direction_coeff: f32 = if (self.direction == .Clockwise) 1 else -1;
         const rotation = self.angle * t * direction_coeff;
         const displacement = self.start_displacement.rotate(rotation);
         const position = self.center.add(displacement);
         return position;
-    }
-};
-
-pub const MultiSegmentPath = struct {
-    segments: []const Path,
-    length: f32,
-
-    pub fn new(segments: []const Path) Path {
-        if (segments.len == 0) {
-            @panic("MultiSegmentPath should have at least one segment");
-        }
-
-        var length: f32 = 0;
-        for (segments) |segment| {
-            length += segment.getLength();
-        }
-
-        return Path{ .multiSegment = MultiSegmentPath{
-            .segments = segments,
-            .length = length,
-        } };
-    }
-
-    pub fn getPosition(self: MultiSegmentPath, offset: f32) Vec {
-        var i: usize = 0;
-        var offset_left = offset;
-        while (i < self.segments.len - 1 and offset_left > self.segments[i].getLength()) {
-            offset_left -= self.segments[i].getLength();
-            i += 1;
-        }
-
-        if (i >= self.segments.len) {
-            i = self.segments.len - 1;
-        }
-
-        return self.segments[i].getPosition(offset_left);
-    }
-
-    pub fn getLength(self: MultiSegmentPath) f32 {
-        return self.length;
     }
 };
